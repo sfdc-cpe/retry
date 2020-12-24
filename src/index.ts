@@ -2,18 +2,10 @@ import { getInput, error, warning, info, debug, setOutput } from '@actions/core'
 import { exec } from 'child_process';
 import ms from 'milliseconds';
 import kill from 'tree-kill';
+import { ActionConfig } from './interfaces';
+import { getInputs } from './inputs';
 
 import { wait } from './util';
-
-// inputs
-const TIMEOUT_MINUTES = getInputNumber('timeout_minutes', false);
-const TIMEOUT_SECONDS = getInputNumber('timeout_seconds', false);
-const MAX_ATTEMPTS = getInputNumber('max_attempts', true) || 3;
-const COMMAND = getInput('command', { required: true });
-const RETRY_WAIT_SECONDS = getInputNumber('retry_wait_seconds', false) || 10;
-const POLLING_INTERVAL_SECONDS = getInputNumber('polling_interval_seconds', false) || 1;
-const RETRY_ON = getInput('retry_on') || 'any';
-const WARNING_ON_RETRY = getInput('warning_on_retry').toLowerCase() === 'true';
 
 const OUTPUT_TOTAL_ATTEMPTS_KEY = 'total_attempts';
 const OUTPUT_EXIT_CODE_KEY = 'exit_code';
@@ -22,52 +14,20 @@ const OUTPUT_EXIT_ERROR_KEY = 'exit_error';
 var exit: number;
 var done: boolean;
 
-function getInputNumber(id: string, required: boolean): number | undefined {
-  const input = getInput(id, { required });
-  const num = Number.parseInt(input);
-
-  // empty is ok
-  if (!input && !required) {
-    return;
-  }
-
-  if (!Number.isInteger(num)) {
-    throw `Input ${id} only accepts numbers.  Received ${input}`;
-  }
-
-  return num;
-}
-
-async function retryWait() {
+async function retryWait(config: ActionConfig) {
   const waitStart = Date.now();
-  await wait(ms.seconds(RETRY_WAIT_SECONDS));
+  await wait(config.retry_wait_seconds);
   debug(`Waited ${Date.now() - waitStart}ms`);
-  debug(`Configured wait: ${ms.seconds(RETRY_WAIT_SECONDS)}ms`);
+  debug(`Configured wait: ${config.retry_wait_seconds}ms`);
 }
 
-async function validateInputs() {
-  if ((!TIMEOUT_MINUTES && !TIMEOUT_SECONDS) || (TIMEOUT_MINUTES && TIMEOUT_SECONDS)) {
-    throw new Error('Must specify either timeout_minutes or timeout_seconds inputs');
-  }
-}
-
-function getTimeout(): number {
-  if (TIMEOUT_MINUTES) {
-    return ms.minutes(TIMEOUT_MINUTES);
-  } else if (TIMEOUT_SECONDS) {
-    return ms.seconds(TIMEOUT_SECONDS);
-  }
-
-  throw new Error('Must specify either timeout_minutes or timeout_seconds inputs');
-}
-
-async function runCmd() {
-  const end_time = Date.now() + getTimeout();
+async function runCmd(config: ActionConfig) {
+  const end_time = Date.now() + config.timeout_ms;
 
   exit = 0;
   done = false;
 
-  var child = exec(COMMAND);
+  var child = exec(config.command);
 
   child.stdout?.on('data', (data) => {
     process.stdout.write(data);
@@ -90,42 +50,41 @@ async function runCmd() {
   });
 
   do {
-    await wait(ms.seconds(POLLING_INTERVAL_SECONDS));
+    await wait(ms.seconds(config.polling_interval_seconds));
   } while (Date.now() < end_time && !done);
 
   if (!done) {
     kill(child.pid);
-    await retryWait();
-    throw new Error(`Timeout of ${getTimeout()}ms hit`);
+    await retryWait(config);
+    throw new Error(`Timeout of ${config.timeout_ms}ms hit`);
   } else if (exit > 0) {
-    await retryWait();
+    await retryWait(config);
     throw new Error(`Child_process exited with error code ${exit}`);
   } else {
     return;
   }
 }
 
-async function runAction() {
-  await validateInputs();
+export async function runAction(config: ActionConfig) {
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+  for (let attempt = 1; attempt <= config.max_attempts; attempt++) {
     try {
       // just keep overwriting attempts output
       setOutput(OUTPUT_TOTAL_ATTEMPTS_KEY, attempt);
-      await runCmd();
+      await runCmd(config);
       info(`Command completed after ${attempt} attempt(s).`);
       break;
     } catch (error) {
-      if (attempt === MAX_ATTEMPTS) {
+      if (attempt === config.max_attempts) {
         throw new Error(`Final attempt failed. ${error.message}`);
-      } else if (!done && RETRY_ON === 'error') {
+      } else if (!done && config.retry_on === 'error') {
         // error: timeout
         throw error;
-      } else if (exit > 0 && RETRY_ON === 'timeout') {
+      } else if (exit > 0 && config.retry_on === 'timeout') {
         // error: error
         throw error;
       } else {
-        if (WARNING_ON_RETRY) {
+        if (config.warning_on_retry) {
           warning(`Attempt ${attempt} failed. Reason: ${error.message}`);
         } else {
           info(`Attempt ${attempt} failed. Reason: ${error.message}`);
@@ -135,18 +94,23 @@ async function runAction() {
   }
 }
 
-runAction()
-  .then(() => {
-    setOutput(OUTPUT_EXIT_CODE_KEY, 0);
-    process.exit(0); // success
-  })
-  .catch((err) => {
-    error(err.message);
+// TODO: after tests added, fix this.  it's not great
+if (!process.env.IS_TEST) {
+  const inputs = getInputs();
 
-    // these can be  helpful to know if continue-on-error is true
-    setOutput(OUTPUT_EXIT_ERROR_KEY, err.message);
-    setOutput(OUTPUT_EXIT_CODE_KEY, exit > 0 ? exit : 1);
+  runAction(inputs)
+    .then(() => {
+      setOutput(OUTPUT_EXIT_CODE_KEY, 0);
+      process.exit(0); // success
+    })
+    .catch((err) => {
+      error(err.message);
 
-    // exit with exact error code if available, otherwise just exit with 1
-    process.exit(exit > 0 ? exit : 1);
-  });
+      // these can be  helpful to know if continue-on-error is true
+      setOutput(OUTPUT_EXIT_ERROR_KEY, err.message);
+      setOutput(OUTPUT_EXIT_CODE_KEY, exit > 0 ? exit : 1);
+
+      // exit with exact error code if available, otherwise just exit with 1
+      process.exit(exit > 0 ? exit : 1);
+    })
+}

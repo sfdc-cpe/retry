@@ -238,84 +238,46 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.runAction = void 0;
 var core_1 = __webpack_require__(470);
 var child_process_1 = __webpack_require__(129);
 var milliseconds_1 = __importDefault(__webpack_require__(156));
 var tree_kill_1 = __importDefault(__webpack_require__(791));
+var inputs_1 = __webpack_require__(679);
 var util_1 = __webpack_require__(322);
-// inputs
-var TIMEOUT_MINUTES = getInputNumber('timeout_minutes', false);
-var TIMEOUT_SECONDS = getInputNumber('timeout_seconds', false);
-var MAX_ATTEMPTS = getInputNumber('max_attempts', true) || 3;
-var COMMAND = core_1.getInput('command', { required: true });
-var RETRY_WAIT_SECONDS = getInputNumber('retry_wait_seconds', false) || 10;
-var POLLING_INTERVAL_SECONDS = getInputNumber('polling_interval_seconds', false) || 1;
-var RETRY_ON = core_1.getInput('retry_on') || 'any';
-var WARNING_ON_RETRY = core_1.getInput('warning_on_retry').toLowerCase() === 'true';
 var OUTPUT_TOTAL_ATTEMPTS_KEY = 'total_attempts';
 var OUTPUT_EXIT_CODE_KEY = 'exit_code';
 var OUTPUT_EXIT_ERROR_KEY = 'exit_error';
 var exit;
 var done;
-function getInputNumber(id, required) {
-    var input = core_1.getInput(id, { required: required });
-    var num = Number.parseInt(input);
-    // empty is ok
-    if (!input && !required) {
-        return;
-    }
-    if (!Number.isInteger(num)) {
-        throw "Input " + id + " only accepts numbers.  Received " + input;
-    }
-    return num;
-}
-function retryWait() {
+function retryWait(config) {
     return __awaiter(this, void 0, void 0, function () {
         var waitStart;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
                     waitStart = Date.now();
-                    return [4 /*yield*/, util_1.wait(milliseconds_1.default.seconds(RETRY_WAIT_SECONDS))];
+                    return [4 /*yield*/, util_1.wait(config.retry_wait_seconds)];
                 case 1:
                     _a.sent();
                     core_1.debug("Waited " + (Date.now() - waitStart) + "ms");
-                    core_1.debug("Configured wait: " + milliseconds_1.default.seconds(RETRY_WAIT_SECONDS) + "ms");
+                    core_1.debug("Configured wait: " + config.retry_wait_seconds + "ms");
                     return [2 /*return*/];
             }
         });
     });
 }
-function validateInputs() {
-    return __awaiter(this, void 0, void 0, function () {
-        return __generator(this, function (_a) {
-            if ((!TIMEOUT_MINUTES && !TIMEOUT_SECONDS) || (TIMEOUT_MINUTES && TIMEOUT_SECONDS)) {
-                throw new Error('Must specify either timeout_minutes or timeout_seconds inputs');
-            }
-            return [2 /*return*/];
-        });
-    });
-}
-function getTimeout() {
-    if (TIMEOUT_MINUTES) {
-        return milliseconds_1.default.minutes(TIMEOUT_MINUTES);
-    }
-    else if (TIMEOUT_SECONDS) {
-        return milliseconds_1.default.seconds(TIMEOUT_SECONDS);
-    }
-    throw new Error('Must specify either timeout_minutes or timeout_seconds inputs');
-}
-function runCmd() {
+function runCmd(config) {
     var _a, _b;
     return __awaiter(this, void 0, void 0, function () {
         var end_time, child;
         return __generator(this, function (_c) {
             switch (_c.label) {
                 case 0:
-                    end_time = Date.now() + getTimeout();
+                    end_time = Date.now() + config.timeout_ms;
                     exit = 0;
                     done = false;
-                    child = child_process_1.exec(COMMAND);
+                    child = child_process_1.exec(config.command);
                     (_a = child.stdout) === null || _a === void 0 ? void 0 : _a.on('data', function (data) {
                         process.stdout.write(data);
                     });
@@ -335,7 +297,7 @@ function runCmd() {
                         done = true;
                     });
                     _c.label = 1;
-                case 1: return [4 /*yield*/, util_1.wait(milliseconds_1.default.seconds(POLLING_INTERVAL_SECONDS))];
+                case 1: return [4 /*yield*/, util_1.wait(milliseconds_1.default.seconds(config.polling_interval_seconds))];
                 case 2:
                     _c.sent();
                     _c.label = 3;
@@ -345,13 +307,13 @@ function runCmd() {
                 case 4:
                     if (!!done) return [3 /*break*/, 6];
                     tree_kill_1.default(child.pid);
-                    return [4 /*yield*/, retryWait()];
+                    return [4 /*yield*/, retryWait(config)];
                 case 5:
                     _c.sent();
-                    throw new Error("Timeout of " + getTimeout() + "ms hit");
+                    throw new Error("Timeout of " + config.timeout_ms + "ms hit");
                 case 6:
                     if (!(exit > 0)) return [3 /*break*/, 8];
-                    return [4 /*yield*/, retryWait()];
+                    return [4 /*yield*/, retryWait(config)];
                 case 7:
                     _c.sent();
                     throw new Error("Child_process exited with error code " + exit);
@@ -360,71 +322,74 @@ function runCmd() {
         });
     });
 }
-function runAction() {
+function runAction(config) {
     return __awaiter(this, void 0, void 0, function () {
         var attempt, error_1;
         return __generator(this, function (_a) {
             switch (_a.label) {
-                case 0: return [4 /*yield*/, validateInputs()];
-                case 1:
-                    _a.sent();
+                case 0:
                     attempt = 1;
+                    _a.label = 1;
+                case 1:
+                    if (!(attempt <= config.max_attempts)) return [3 /*break*/, 6];
                     _a.label = 2;
                 case 2:
-                    if (!(attempt <= MAX_ATTEMPTS)) return [3 /*break*/, 7];
-                    _a.label = 3;
-                case 3:
-                    _a.trys.push([3, 5, , 6]);
+                    _a.trys.push([2, 4, , 5]);
                     // just keep overwriting attempts output
                     core_1.setOutput(OUTPUT_TOTAL_ATTEMPTS_KEY, attempt);
-                    return [4 /*yield*/, runCmd()];
-                case 4:
+                    return [4 /*yield*/, runCmd(config)];
+                case 3:
                     _a.sent();
                     core_1.info("Command completed after " + attempt + " attempt(s).");
-                    return [3 /*break*/, 7];
-                case 5:
+                    return [3 /*break*/, 6];
+                case 4:
                     error_1 = _a.sent();
-                    if (attempt === MAX_ATTEMPTS) {
+                    if (attempt === config.max_attempts) {
                         throw new Error("Final attempt failed. " + error_1.message);
                     }
-                    else if (!done && RETRY_ON === 'error') {
+                    else if (!done && config.retry_on === 'error') {
                         // error: timeout
                         throw error_1;
                     }
-                    else if (exit > 0 && RETRY_ON === 'timeout') {
+                    else if (exit > 0 && config.retry_on === 'timeout') {
                         // error: error
                         throw error_1;
                     }
                     else {
-                        if (WARNING_ON_RETRY) {
+                        if (config.warning_on_retry) {
                             core_1.warning("Attempt " + attempt + " failed. Reason: " + error_1.message);
                         }
                         else {
                             core_1.info("Attempt " + attempt + " failed. Reason: " + error_1.message);
                         }
                     }
-                    return [3 /*break*/, 6];
-                case 6:
+                    return [3 /*break*/, 5];
+                case 5:
                     attempt++;
-                    return [3 /*break*/, 2];
-                case 7: return [2 /*return*/];
+                    return [3 /*break*/, 1];
+                case 6: return [2 /*return*/];
             }
         });
     });
 }
-runAction()
-    .then(function () {
-    core_1.setOutput(OUTPUT_EXIT_CODE_KEY, 0);
-    process.exit(0); // success
-})
-    .catch(function (err) {
-    core_1.error(err.message);
-    // these can be  helpful to know if continue-on-error is true
-    core_1.setOutput(OUTPUT_EXIT_ERROR_KEY, err.message);
-    core_1.setOutput(OUTPUT_EXIT_CODE_KEY, exit > 0 ? exit : 1);
-    // exit with exact error code if available, otherwise just exit with 1
-    process.exit(exit > 0 ? exit : 1);
-});
+exports.runAction = runAction;
+// TODO: after tests added, fix this.  it's not great
+if (!process.env.IS_TEST) {
+    var inputs = inputs_1.getInputs();
+    runAction(inputs)
+        .then(function () {
+        core_1.setOutput(OUTPUT_EXIT_CODE_KEY, 0);
+        process.exit(0); // success
+    })
+        .catch(function (err) {
+        core_1.error(err.message);
+        // these can be  helpful to know if continue-on-error is true
+        core_1.setOutput(OUTPUT_EXIT_ERROR_KEY, err.message);
+        core_1.setOutput(OUTPUT_EXIT_CODE_KEY, exit > 0 ? exit : 1);
+        // exit with exact error code if available, otherwise just exit with 1
+        process.exit(exit > 0 ? exit : 1);
+    });
+}
 
 
 /***/ }),
@@ -764,6 +729,63 @@ exports.getState = getState;
 /***/ (function(module) {
 
 module.exports = require("path");
+
+/***/ }),
+
+/***/ 679:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getInputs = exports.EITHER_MINUTES_OR_SECONDS_ERR = exports.DEFAULT_RETRY_ON = exports.DEFAULT_POLLING_INTERVAL_SECONDS = exports.DEFAULT_RETRY_WAIT_SECONDS = exports.DEFAULT_MAX_ATTEMPTS = void 0;
+var core_1 = __webpack_require__(470);
+var milliseconds_1 = __importDefault(__webpack_require__(156));
+exports.DEFAULT_MAX_ATTEMPTS = 3;
+exports.DEFAULT_RETRY_WAIT_SECONDS = 10;
+exports.DEFAULT_POLLING_INTERVAL_SECONDS = 1;
+exports.DEFAULT_RETRY_ON = 'any';
+exports.EITHER_MINUTES_OR_SECONDS_ERR = new Error('Must specify either timeout_minutes or timeout_seconds inputs');
+function getInputNumber(id, required) {
+    var input = core_1.getInput(id, { required: required });
+    var num = Number.parseInt(input);
+    // empty is ok
+    if (!input && !required) {
+        return;
+    }
+    if (!Number.isInteger(num)) {
+        throw "Input " + id + " only accepts numbers.  Received " + input;
+    }
+    return num;
+}
+function getInputs() {
+    var timeout_minutes = getInputNumber('timeout_minutes', false);
+    var timeout_seconds = getInputNumber('timeout_seconds', false);
+    var max_attempts = getInputNumber('max_attempts', false) || exports.DEFAULT_MAX_ATTEMPTS;
+    var command = core_1.getInput('command', { required: true });
+    var retry_wait_seconds = getInputNumber('retry_wait_seconds', false) || exports.DEFAULT_RETRY_WAIT_SECONDS;
+    var polling_interval_seconds = getInputNumber('polling_interval_seconds', false) || exports.DEFAULT_POLLING_INTERVAL_SECONDS;
+    var retry_on = core_1.getInput('retry_on') || exports.DEFAULT_RETRY_ON;
+    var warning_on_retry = core_1.getInput('warning_on_retry').toLowerCase() === 'true';
+    if ((!timeout_minutes && !timeout_seconds) || (timeout_minutes && timeout_seconds)) {
+        throw exports.EITHER_MINUTES_OR_SECONDS_ERR;
+    }
+    var timeout_ms = timeout_minutes ? milliseconds_1.default.minutes(timeout_minutes) : milliseconds_1.default.seconds(timeout_seconds);
+    return {
+        timeout_ms: timeout_ms,
+        max_attempts: max_attempts,
+        command: command,
+        retry_on: retry_on,
+        retry_wait_seconds: retry_wait_seconds,
+        polling_interval_seconds: polling_interval_seconds,
+        warning_on_retry: warning_on_retry
+    };
+}
+exports.getInputs = getInputs;
+
 
 /***/ }),
 
