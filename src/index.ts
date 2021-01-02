@@ -1,4 +1,4 @@
-import { getInput, error, warning, info, debug, setOutput } from '@actions/core';
+import { error, warning, info, debug, setOutput } from '@actions/core';
 import { exec } from 'child_process';
 import ms from 'milliseconds';
 import kill from 'tree-kill';
@@ -14,14 +14,14 @@ const OUTPUT_EXIT_ERROR_KEY = 'exit_error';
 var exit: number;
 var done: boolean;
 
-async function retryWait(config: ActionConfig) {
+export async function retryWait(config: ActionConfig) {
   const waitStart = Date.now();
   await wait(config.retry_wait_seconds);
   debug(`Waited ${Date.now() - waitStart}ms`);
   debug(`Configured wait: ${config.retry_wait_seconds}ms`);
 }
 
-async function runCmd(config: ActionConfig) {
+export async function runCmd(config: ActionConfig) {
   const end_time = Date.now() + config.timeout_ms;
 
   exit = 0;

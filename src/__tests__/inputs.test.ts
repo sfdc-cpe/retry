@@ -1,7 +1,7 @@
-import { DEFAULT_MAX_ATTEMPTS, DEFAULT_POLLING_INTERVAL_SECONDS, DEFAULT_RETRY_ON, EITHER_MINUTES_OR_SECONDS_ERR, getInputs } from '../inputs';
+import { DEFAULT_MAX_ATTEMPTS, DEFAULT_POLLING_INTERVAL_SECONDS, DEFAULT_RETRY_ON, DEFAULT_RETRY_WAIT_SECONDS, EITHER_MINUTES_OR_SECONDS_ERR, getInputs } from '../inputs';
 import { Inputs } from '../interfaces';
 
-// TODO: after tests added, don't do this. it's turrrrble
+// TODO: don't do this
 process.env.IS_TEST = 'true';
 
 const DEFAULT_INPUTS: Inputs = {
@@ -122,6 +122,18 @@ describe('getInputs', () => {
     expect(inputs.max_attempts).toEqual(DEFAULT_MAX_ATTEMPTS);
   });
 
+  test('retry_wait_seconds', async () => {
+    const testData = { ...DEFAULT_INPUTS };
+    // @ts-ignore
+    delete testData.retry_wait_seconds
+    mockInputs({
+      ...testData
+    })
+    const inputs = getInputs()
+
+    expect(inputs.retry_wait_seconds).toEqual(DEFAULT_RETRY_WAIT_SECONDS);
+  });
+
   test('polling_interval_seconds', async () => {
     const testData = { ...DEFAULT_INPUTS };
     // @ts-ignore
@@ -146,4 +158,21 @@ describe('getInputs', () => {
     expect(inputs.retry_on).toEqual(DEFAULT_RETRY_ON);
   });
 
+  test('invalid numeric input', async () => {
+    const testData = { ...DEFAULT_INPUTS };
+
+    mockInputs({
+      ...testData
+    })
+    process.env.INPUT_TIMEOUT_SECONDS = 'ZZZ';
+    let err = '';
+
+    try {
+      await getInputs();
+    } catch (error) {
+      err = error.message;
+    }
+
+    expect(err).toContain('only accepts numbers');
+  });
 });

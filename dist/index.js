@@ -238,7 +238,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.runAction = void 0;
+exports.runAction = exports.runCmd = exports.retryWait = void 0;
 var core_1 = __webpack_require__(470);
 var child_process_1 = __webpack_require__(129);
 var milliseconds_1 = __importDefault(__webpack_require__(156));
@@ -267,6 +267,7 @@ function retryWait(config) {
         });
     });
 }
+exports.retryWait = retryWait;
 function runCmd(config) {
     var _a, _b;
     return __awaiter(this, void 0, void 0, function () {
@@ -322,6 +323,7 @@ function runCmd(config) {
         });
     });
 }
+exports.runCmd = runCmd;
 function runAction(config) {
     return __awaiter(this, void 0, void 0, function () {
         var attempt, error_1;
@@ -757,7 +759,7 @@ function getInputNumber(id, required) {
         return;
     }
     if (!Number.isInteger(num)) {
-        throw "Input " + id + " only accepts numbers.  Received " + input;
+        throw new Error("Input " + id + " only accepts numbers.  Received " + input);
     }
     return num;
 }

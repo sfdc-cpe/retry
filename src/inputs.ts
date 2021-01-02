@@ -18,7 +18,7 @@ function getInputNumber(id: string, required: boolean): number | undefined {
   }
 
   if (!Number.isInteger(num)) {
-    throw `Input ${id} only accepts numbers.  Received ${input}`;
+    throw new Error(`Input ${id} only accepts numbers.  Received ${input}`);
   }
 
   return num;

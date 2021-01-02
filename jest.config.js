@@ -8,8 +8,7 @@ module.exports = {
   ],
   testEnvironment: 'node',
   testMatch: [
-    "**/__tests__/**/*.[t]s?(x)",
-    "**/?(*.)+(spec|test).[t]s?(x)"
+    "**/__tests__/**/*.(spec|test).[t]s?(x)",
   ],
   transform: {
     '^.+\\.(ts|tsx)$': require.resolve('ts-jest')
