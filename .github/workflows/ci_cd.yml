@@ -228,7 +228,7 @@ jobs:
           node-version: 12
       - name: Install dependencies
         run: npm ci --ignore-scripts
-      - name: Multiline command 1
+      - name: Multiline, multi command
         uses: ./
         with:
           timeout_minutes: 1
@@ -236,21 +236,13 @@ jobs:
           command: |
             echo "abc"
             echo "123"
-      - name: Multiline command 2
+      - name: Multiline single command
         uses: ./
         with:
           timeout_minutes: 1
           max_attempts: 1
           command: >-
-            echo "abc"
-            echo "123"
-      - name: Multiline command 3
-        uses: ./
-        with:
-          timeout_minutes: 1
-          max_attempts: 1
-          command: >-
-            echo "abc \
+            echo "abc 
             123"
       - name: Powershell test
         uses: ./
