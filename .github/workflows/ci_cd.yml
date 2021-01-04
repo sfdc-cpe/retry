@@ -236,12 +236,28 @@ jobs:
           command: |
             echo "abc"
             echo "123"
-      - name: Multiline single command
+      - name: Multiline single command -
         uses: ./
         with:
           timeout_minutes: 1
           max_attempts: 1
           command: >-
+            echo "abc 
+            123"
+      - name: Multiline single command -
+        uses: ./
+        with:
+          timeout_minutes: 1
+          max_attempts: 1
+          command: >
+            echo "abc 
+            123"
+      - name: Multiline single command +
+        uses: ./
+        with:
+          timeout_minutes: 1
+          max_attempts: 1
+          command: >+
             echo "abc 
             123"
       - name: Powershell test
