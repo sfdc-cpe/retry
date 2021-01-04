@@ -244,6 +244,14 @@ jobs:
           command: >-
             echo "abc"
             echo "123"
+      - name: Multiline command 3
+        uses: ./
+        with:
+          timeout_minutes: 1
+          max_attempts: 1
+          command: >-
+            echo "abc \
+            123"
       - name: Powershell test
         uses: ./
         with:
