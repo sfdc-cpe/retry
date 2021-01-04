@@ -7,7 +7,7 @@ jobs:
   # runs on branch pushes only
   ci:
     name: Run Tests
-    if: startsWith(github.ref, 'refs/heads')
+    if: startsWith(github.ref, 'refs/headszzzz')
     runs-on: ubuntu-18.04
     steps:
       - name: Checkout
@@ -17,7 +17,7 @@ jobs:
         with:
           node-version: 12
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: happy-path
         id: happy_path
@@ -227,7 +227,15 @@ jobs:
         with:
           node-version: 12
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
+      - name: Multiline command
+        uses: ./
+        with:
+          timeout_minutes: 1
+          max_attempts: 1
+          command: |
+            echo "abc"
+            echo "123"
       - name: Powershell test
         uses: ./
         with:
@@ -264,7 +272,7 @@ jobs:
         with:
           node-version: 12
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Release
         id: semantic
         uses: cycjimmy/semantic-release-action@v2
